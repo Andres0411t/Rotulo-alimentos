@@ -495,12 +495,22 @@
             }
 
             #print-root {
-                position: fixed;
+                position: absolute;
                 top: 0;
                 left: 0;
                 width: 210mm;
                 height: 297mm;
                 background: #ffffff;
+                overflow: hidden !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            #print-root .print-grid{
+                width:210mm !important;
+                height:297mm !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
 
             #print-root .a4-wrapper {
@@ -813,8 +823,10 @@
             printRoot.style.display = 'block';
 
             // 3. Pequeño delay para que el browser pinte el clon antes de imprimir
-            setTimeout(() => {
-                window.print();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    window.print();
+                });
 
                 // 4. Ocultar el clon nuevamente al cerrar el diálogo de impresión
                 //    (afterprint es el evento correcto, pero como fallback usamos otro timeout)
