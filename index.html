@@ -11,8 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- html2pdf.js via CDN para exportación -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Sin dependencias externas: usamos window.print() nativo para PDF perfecto -->
 
     <style>
         /* ==========================================================================
@@ -464,63 +463,58 @@
             letter-spacing: -0.1px;
         }
 
-        /* Ajustes específicos de PDF export */
-        .pdf-exporting .label-card {
-            border: none !important;
-            /* Limpia bordes de ayuda visual durante exportación */
-        }
-
-        #print-area.pdf-exporting {
-            width: 210mm !important;
-            height: 297mm !important;
-            aspect-ratio: auto;
-            transform: none;
-            transform-origin: top left;
-            box-shadow: none;
-            background-color: #ffffff;
-        }
-
         @page {
             size: A4 portrait;
             margin: 0;
         }
 
         @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
             html,
             body {
                 width: 210mm;
                 height: 297mm;
+                margin: 0;
+                padding: 0;
                 overflow: hidden;
                 background: #ffffff;
             }
 
-            .app-container,
-            .preview-pane {
-                padding: 0;
-                margin: 0;
-                background: #ffffff;
+            /* Ocultar todo excepto el área de impresión */
+            body > * {
+                display: none !important;
             }
 
-            .sidebar {
-                display: none;
+            body > #print-root {
+                display: block !important;
             }
 
-            .a4-wrapper,
-            #print-area.pdf-exporting {
-                width: 210mm !important;
-                height: 297mm !important;
-                box-shadow: none;
-                transform: none;
-            }
-
-            .pdf-clone {
+            #print-root {
                 position: fixed;
-                left: -10000px;
                 top: 0;
+                left: 0;
                 width: 210mm;
                 height: 297mm;
-                overflow: hidden;
                 background: #ffffff;
+            }
+
+            #print-root .a4-wrapper {
+                width: 210mm !important;
+                height: 297mm !important;
+                box-shadow: none !important;
+                transform: none !important;
+                aspect-ratio: auto !important;
+            }
+
+            /* Ocultar bordes de guia de corte al imprimir */
+            #print-root .label-card {
+                border-right: none !important;
+                border-bottom: none !important;
             }
         }
 
@@ -671,6 +665,13 @@
         </main>
     </div>
 
+    <!-- Contenedor de impresión: visible solo al imprimir/exportar PDF -->
+    <div id="print-root" style="display:none;">
+        <div class="a4-wrapper" id="print-area-clone">
+            <div class="print-grid" id="labels-container-clone"></div>
+        </div>
+    </div>
+
     <script>
         // ==========================================================================
         // LÓGICA DE APLICACIÓN E INYECCIÓN DE DATOS
@@ -799,61 +800,33 @@
         }
 
         // ==========================================================================
-        // EXPORTACIÓN A PDF EXACTO
+        // EXPORTACIÓN A PDF - USA window.print() NATIVO (100% fiel a CSS mm)
         // ==========================================================================
         function generatePDF() {
-            const printArea = document.getElementById('print-area');
-            const btn = document.getElementById('btn-exportar');
-            const originalHTML = btn.innerHTML;
+            // 1. Copiar el contenido actual de los rótulos al clon de impresión
+            const sourceGrid = document.getElementById('labels-container');
+            const cloneGrid  = document.getElementById('labels-container-clone');
+            cloneGrid.innerHTML = sourceGrid.innerHTML;
 
-            btn.innerHTML = `
-                <svg class="spinner" viewBox="0 0 50 50">
-                    <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-                </svg>
-                <span>Generando Documento...</span>
-            `;
-            btn.disabled = true;
+            // 2. Mostrar el div de impresión (el CSS de @media print lo maneja)
+            const printRoot = document.getElementById('print-root');
+            printRoot.style.display = 'block';
 
-            const exportClone = printArea.cloneNode(true);
-            exportClone.classList.add('pdf-exporting');
-            exportClone.classList.add('pdf-clone');
-            document.body.appendChild(exportClone);
-
-            const opt = {
-                margin: 0,
-                filename: 'Rotulos_Reempaque.pdf',
-                image: { type: 'jpeg', quality: 1.0 },
-                pagebreak: { mode: [] },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    scrollY: 0,
-                    scrollX: 0,
-                    windowWidth: 794,
-                    windowHeight: 1123,
-                    backgroundColor: '#ffffff'
-                },
-                jsPDF: {
-                    unit: 'mm',
-                    format: 'a4',
-                    orientation: 'portrait'
-                }
-            };
-
+            // 3. Pequeño delay para que el browser pinte el clon antes de imprimir
             setTimeout(() => {
-                html2pdf().set(opt).from(exportClone).save().then(() => {
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                    exportClone.remove();
-                }).catch(err => {
-                    console.error('Error generando PDF:', err);
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                    exportClone.remove();
-                    alert('Ocurrió un problema generando el documento PDF. Revise la consola.');
-                });
-            }, 50);
+                window.print();
+
+                // 4. Ocultar el clon nuevamente al cerrar el diálogo de impresión
+                //    (afterprint es el evento correcto, pero como fallback usamos otro timeout)
+                const cleanup = () => {
+                    printRoot.style.display = 'none';
+                    window.removeEventListener('afterprint', cleanup);
+                };
+                window.addEventListener('afterprint', cleanup);
+
+                // Fallback por si afterprint no dispara
+                setTimeout(cleanup, 2000);
+            }, 100);
         }
     </script>
 </body>
