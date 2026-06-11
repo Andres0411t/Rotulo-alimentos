@@ -515,10 +515,27 @@
 
             #print-root .a4-wrapper {
                 width: 210mm !important;
+                min-width: 210mm !important;
+                max-width: 210mm !important;
                 height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
                 box-shadow: none !important;
                 transform: none !important;
                 aspect-ratio: auto !important;
+                overflow: hidden !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+            }
+
+            #print-root,
+            #print-root * {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            .label-card {
+                height: calc(297mm / 6) !important;
             }
 
             /* Ocultar bordes de guia de corte al imprimir */
