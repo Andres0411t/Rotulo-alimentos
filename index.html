@@ -543,6 +543,18 @@
                 margin-top:0 !important;
             }
 
+            
+            #print-root.mobile-print {
+                transform: scale(0.84) !important;
+                transform-origin: top left !important;
+            }
+
+            #print-root.desktop-print {
+                transform: scale(0.90) !important;
+                transform-origin: top left !important;
+            }
+
+
             /* Ocultar bordes de guia de corte al imprimir */
             #print-root .label-card {
                 border-right: none !important;
@@ -863,6 +875,22 @@
             }, 100);
         }
     </script>
+
+<script>
+(function(){
+    const originalPrint = window.print;
+    window.print = function(){
+        const root = document.getElementById('print-root');
+        if(root){
+            const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+            root.classList.remove('mobile-print','desktop-print');
+            root.classList.add(isMobile ? 'mobile-print' : 'desktop-print');
+        }
+        originalPrint.call(window);
+    };
+})();
+</script>
 </body>
+
 
 </html>
