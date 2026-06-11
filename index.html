@@ -11,7 +11,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Sin dependencias externas: usamos window.print() nativo para PDF perfecto -->
+    <!-- Librerías para generación de PDF pixel-perfect en móvil y PC -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         /* ==========================================================================
@@ -463,84 +465,6 @@
             letter-spacing: -0.1px;
         }
 
-        @page {
-            size: letter portrait;
-            margin: 0;
-        }
-
-        @media print {
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-            }
-
-            html {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 816px !important;
-                overflow: hidden !important;
-                background: #ffffff !important;
-            }
-
-            body > * { display: none !important; }
-            body > #print-root { display: block !important; }
-
-            #print-root {
-                display: block !important;
-                width: 816px !important;
-                height: 1056px !important;
-                overflow: hidden !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                page-break-after: avoid !important;
-                page-break-before: avoid !important;
-                break-after: avoid !important;
-                break-before: avoid !important;
-            }
-
-            #sheet-scaler {
-                display: block !important;
-                width: 816px !important;
-                height: 1056px !important;
-                overflow: hidden !important;
-            }
-
-            #print-root .a4-wrapper {
-                width: 816px !important;
-                height: 1056px !important;
-                max-height: 1056px !important;
-                box-shadow: none !important;
-                transform: none !important;
-                aspect-ratio: auto !important;
-                overflow: hidden !important;
-            }
-
-            #print-root .print-grid {
-                display: grid !important;
-                grid-template-columns: repeat(3, 1fr) !important;
-                grid-template-rows: repeat(6, 176px) !important;
-                width: 816px !important;
-                height: 1056px !important;
-                overflow: hidden !important;
-            }
-
-            #print-root .label-card {
-                height: 176px !important;
-                max-height: 176px !important;
-                overflow: hidden !important;
-                border-right: none !important;
-                border-bottom: none !important;
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
-            }
-        }
-
                 /* ==========================================================================
            RESPONSIVIDAD (MOBILE)
            ========================================================================== */
@@ -586,13 +510,18 @@
                 justify-content: center;
             }
 
-            .a4-wrapper {
-                width: min(100%, 215.9mm);
-                height: auto;
-                aspect-ratio: 215.9 / 279.4;
+            /* En móvil la hoja se escala via JS para caber en pantalla */
+            .preview-pane {
+                padding: 12px !important;
+                align-items: center !important;
+                overflow: hidden !important;
             }
 
-            /* La hoja a4 conserva su tamaño de impresión, el usuario puede hacer scroll para ver */
+            .preview-scaler {
+                transform-origin: top center;
+                display: flex;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -680,22 +609,17 @@
 
         <!-- VISTA PREVIA (RESULTADO PDF) -->
         <main class="preview-pane">
-            <div class="a4-wrapper" id="print-area">
-                <div class="print-grid" id="labels-container">
-                    <!-- Los 18 rótulos se inyectarán aquí mediante JS -->
+            <div class="preview-scaler" id="preview-scaler">
+                <div class="a4-wrapper" id="print-area">
+                    <div class="print-grid" id="labels-container">
+                        <!-- Los 18 rótulos se inyectarán aquí mediante JS -->
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Contenedor de impresión: visible solo al imprimir/exportar PDF -->
-    <div id="print-root" style="display:none;">
-        <div id="sheet-scaler">
-            <div class="a4-wrapper" id="print-area-clone">
-                <div class="print-grid" id="labels-container-clone"></div>
-            </div>
-        </div>
-    </div>
+
 
     <script>
         // ==========================================================================
@@ -822,30 +746,119 @@
                 label.querySelector('.val-lote').textContent = data.lote;
                 label.querySelector('.val-responsable').textContent = data.responsable;
             });
+            scalePreview();
         }
 
         // ==========================================================================
         // EXPORTACIÓN A PDF - USA window.print() NATIVO (100% fiel a CSS mm)
         // ==========================================================================
-        function generatePDF() {
-            const sourceGrid = document.getElementById('labels-container');
-            const cloneGrid  = document.getElementById('labels-container-clone');
-            cloneGrid.innerHTML = sourceGrid.innerHTML;
+        // =====================================================================
+        // ESCALA LA VISTA PREVIA EN MÓVIL PARA QUE QUEPA EN PANTALLA
+        // =====================================================================
+        function scalePreview() {
+            const scaler  = document.getElementById('preview-scaler');
+            const wrapper = document.getElementById('print-area');
+            if (!scaler || !wrapper) return;
 
-            const printRoot = document.getElementById('print-root');
-            printRoot.style.display = 'block';
+            // Reset scale para medir disponible real
+            scaler.style.transform = '';
+            scaler.style.width = '';
+            scaler.style.height = '';
 
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    window.print();
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                // Desktop: sin escala, la hoja se ve en su tamaño natural con scroll
+                wrapper.style.transform = '';
+                return;
+            }
+
+            const pane = scaler.parentElement;
+            const paneW = pane.clientWidth - 24; // 12px padding cada lado
+            const sheetW = wrapper.offsetWidth;
+            const sheetH = wrapper.offsetHeight;
+
+            if (sheetW === 0) return;
+
+            const scale = Math.min(paneW / sheetW, 1);
+            scaler.style.transformOrigin = 'top center';
+            scaler.style.transform = 'scale(' + scale + ')';
+            // Ajustar altura del contenedor para no dejar espacio en blanco
+            scaler.style.width  = sheetW + 'px';
+            scaler.style.height = (sheetH * scale) + 'px';
+        }
+
+        window.addEventListener('resize', scalePreview);
+        window.addEventListener('load', scalePreview);
+
+        async function generatePDF() {
+            const btn = document.getElementById('btn-exportar');
+            const btnSpan = btn.querySelector('span');
+            const originalText = btnSpan.textContent;
+
+            // Feedback visual
+            btn.disabled = true;
+            btnSpan.textContent = 'Generando PDF...';
+
+            try {
+                const sheet = document.getElementById('print-area');
+
+                // Guardar transform actual (mobile scale) y resetearlo temporalmente
+                const scaler = document.getElementById('preview-scaler');
+                const savedTransform = scaler.style.transform;
+                const savedWidth     = scaler.style.width;
+                const savedHeight    = scaler.style.height;
+                scaler.style.transform = 'none';
+                scaler.style.width  = '';
+                scaler.style.height = '';
+
+                // Forzar que la hoja se vea a tamaño real antes de capturar
+                sheet.style.transform = 'none';
+
+                // Pequeña pausa para que el navegador repinte
+                await new Promise(r => setTimeout(r, 100));
+
+                const canvas = await html2canvas(sheet, {
+                    scale: 2,           // Alta resolución
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    width:  sheet.offsetWidth,
+                    height: sheet.offsetHeight,
+                    windowWidth:  sheet.offsetWidth,
+                    windowHeight: sheet.offsetHeight
                 });
-                const cleanup = () => {
-                    printRoot.style.display = 'none';
-                    window.removeEventListener('afterprint', cleanup);
-                };
-                window.addEventListener('afterprint', cleanup);
-                setTimeout(cleanup, 3000);
-            });
+
+                // Restaurar estado visual móvil
+                scaler.style.transform = savedTransform;
+                scaler.style.width     = savedWidth;
+                scaler.style.height    = savedHeight;
+                sheet.style.transform  = '';
+
+                // Crear PDF tamaño Carta
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'letter'  // 215.9 x 279.4 mm
+                });
+
+                const pageW = pdf.internal.pageSize.getWidth();   // 215.9mm
+                const pageH = pdf.internal.pageSize.getHeight();  // 279.4mm
+
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+                // Imagen cubre exactamente toda la página
+                pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH);
+                pdf.save('rotulos-reempaque.pdf');
+
+            } catch (err) {
+                console.error('Error generando PDF:', err);
+                alert('Error al generar el PDF. Intente nuevamente.');
+            } finally {
+                btn.disabled = false;
+                btnSpan.textContent = originalText;
+            }
         }
     </script>
 </body>
