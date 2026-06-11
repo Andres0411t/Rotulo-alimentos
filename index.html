@@ -424,6 +424,7 @@
             align-items: center;
             padding: 0 3px;
             width: 100%;
+            min-width: 0;
         }
 
         .row-label {
@@ -445,6 +446,8 @@
             text-overflow: clip;
             /* Clip evita puntos suspensivos para aprovechar espacio total */
             flex: 1;
+            min-width: 0;
+            line-height: 1;
         }
 
         /* --- Pie de página del Rótulo --- */
@@ -821,8 +824,8 @@
                     logging: false,
                     scrollY: 0,
                     scrollX: 0,
-                    windowWidth: printArea.scrollWidth,
-                    windowHeight: printArea.scrollHeight,
+                    windowWidth: printArea.clientWidth,
+                    windowHeight: printArea.clientHeight,
                     backgroundColor: '#ffffff'
                 },
                 jsPDF: {
