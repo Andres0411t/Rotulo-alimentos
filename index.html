@@ -276,7 +276,7 @@
            ÁREA DE IMPRESIÓN (La Hoja A4 y Rótulos)
            ========================================================================== */
 
-        /* Contenedor que simula la hoja Carta (Letter) */
+        /* Contenedor que simula la hoja Carta */
         .a4-wrapper {
             width: 215.9mm;
             height: 279.4mm;
@@ -475,82 +475,73 @@
                 color-adjust: exact !important;
             }
 
-            html,
+            html {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
             body {
-                width: 215.9mm;
-                height: 279.4mm;
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
-                background: #ffffff;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 816px !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
             }
 
-            /* Ocultar todo excepto el área de impresión */
-            body > * {
-                display: none !important;
-            }
-
-            body > #print-root {
-                display: block !important;
-            }
+            body > * { display: none !important; }
+            body > #print-root { display: block !important; }
 
             #print-root {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 215.9mm;
-                height: 279.4mm;
-                background: #ffffff;
+                display: block !important;
+                width: 816px !important;
+                height: 1056px !important;
                 overflow: hidden !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                break-after: avoid !important;
+                break-before: avoid !important;
             }
 
-            #print-root .print-grid{
-                width:215.9mm !important;
-                height:279.4mm !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+            #sheet-scaler {
+                display: block !important;
+                width: 816px !important;
+                height: 1056px !important;
+                overflow: hidden !important;
             }
 
             #print-root .a4-wrapper {
-                width: 215.9mm !important;
-                min-width: 215.9mm !important;
-                max-width: 215.9mm !important;
-                height: 279.4mm !important;
-                min-height: 279.4mm !important;
-                max-height: 279.4mm !important;
+                width: 816px !important;
+                height: 1056px !important;
+                max-height: 1056px !important;
                 box-shadow: none !important;
                 transform: none !important;
                 aspect-ratio: auto !important;
                 overflow: hidden !important;
-                page-break-after: avoid !important;
-                page-break-before: avoid !important;
             }
 
-            #print-root,
-            #print-root * {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+            #print-root .print-grid {
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                grid-template-rows: repeat(6, 176px) !important;
+                width: 816px !important;
+                height: 1056px !important;
+                overflow: hidden !important;
             }
 
-            .label-card {
-                height: calc(279.4mm / 6) !important;
-            }
-
-            #print-root .print-grid{
-                height:279.4mm !important;
-                margin-top:0 !important;
-            }
-
-            /* Ocultar bordes de guia de corte al imprimir */
             #print-root .label-card {
+                height: 176px !important;
+                max-height: 176px !important;
+                overflow: hidden !important;
                 border-right: none !important;
                 border-bottom: none !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
             }
         }
 
-        /* ==========================================================================
+                /* ==========================================================================
            RESPONSIVIDAD (MOBILE)
            ========================================================================== */
         @media (max-width: 768px) {
@@ -699,8 +690,10 @@
 
     <!-- Contenedor de impresión: visible solo al imprimir/exportar PDF -->
     <div id="print-root" style="display:none;">
-        <div class="a4-wrapper" id="print-area-clone">
-            <div class="print-grid" id="labels-container-clone"></div>
+        <div id="sheet-scaler">
+            <div class="a4-wrapper" id="print-area-clone">
+                <div class="print-grid" id="labels-container-clone"></div>
+            </div>
         </div>
     </div>
 
@@ -835,34 +828,24 @@
         // EXPORTACIÓN A PDF - USA window.print() NATIVO (100% fiel a CSS mm)
         // ==========================================================================
         function generatePDF() {
-            // 1. Copiar el contenido actual de los rótulos al clon de impresión
             const sourceGrid = document.getElementById('labels-container');
             const cloneGrid  = document.getElementById('labels-container-clone');
             cloneGrid.innerHTML = sourceGrid.innerHTML;
 
-            // 2. Mostrar el div de impresión (el CSS de @media print lo maneja)
             const printRoot = document.getElementById('print-root');
             printRoot.style.display = 'block';
 
-            // 3. Pequeño delay para que el browser pinte el clon antes de imprimir
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     window.print();
                 });
-
-                // 4. Ocultar el clon nuevamente al cerrar el diálogo de impresión
-                //    (afterprint es el evento correcto, pero como fallback usamos otro timeout)
                 const cleanup = () => {
                     printRoot.style.display = 'none';
                     window.removeEventListener('afterprint', cleanup);
                 };
                 window.addEventListener('afterprint', cleanup);
-
-                // Fallback por si afterprint no dispara
-                setTimeout(cleanup, 2000);
-            }, 100);
+                setTimeout(cleanup, 3000);
+            });
         }
     </script>
 </body>
-
-</html>
